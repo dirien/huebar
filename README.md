@@ -19,7 +19,8 @@ HueBar talks to your Hue Bridge directly on your local network using the [Hue CL
 
 - The header shows how many lights are on, with a master power button
 - Room and zone cards are tinted with the colors of their lit lights, with a Control Center–style brightness bar
-- Expanding a room shows its scenes and lights; each light has a color-temperature track and color presets
+- Expanding a room shows its scenes and lights; white lights get a warm-to-cool temperature track
+- Color lights get a hue/saturation color wheel, quick presets, and an eyedropper that picks any color on your screen
 - Live state from the bridge's event stream, so changes from the Hue app or a wall switch show up immediately
 - Sliders read 0 while a light is off; dragging to 0 turns it off, dragging up turns it on
 - Finds the bridge via Bonjour and follows it if DHCP gives it a new IP address
