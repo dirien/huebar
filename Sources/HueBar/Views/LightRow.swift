@@ -123,8 +123,18 @@ private struct ColorPanel: View {
                 }
             }
             if let current = light.color {
-                VStack(alignment: .leading, spacing: 8) {
-                    PanelLabel(icon: .palette, title: "Color")
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        PanelLabel(icon: .palette, title: "Color")
+                        Spacer()
+                        EyedropperButton { picked in
+                            store.setColor(picked, light: light.id)
+                        }
+                    }
+                    ColorWheel(color: light.isInColorTemperatureMode ? nil : ColorMath.rgb(xy: current.xy)) { picked in
+                        store.setColor(picked, light: light.id)
+                    }
+                    .frame(maxWidth: .infinity)
                     HStack(spacing: 4) {
                         ForEach(Self.colors) { swatch in
                             SwatchButton(

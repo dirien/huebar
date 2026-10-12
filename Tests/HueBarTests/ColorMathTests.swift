@@ -32,6 +32,26 @@ struct ColorMathTests {
         #expect(ColorMath.clamp(inside, to: gamutC) == inside)
     }
 
+    @Test(arguments: [0.0, 0.08, 1.0 / 6, 0.33, 0.5, 0.61, 0.75, 0.92])
+    func hueSaturationRoundTrips(hue: Double) {
+        for saturation in [0.2, 0.55, 1.0] {
+            let rgb = ColorMath.rgb(hue: hue, saturation: saturation)
+            let back = ColorMath.hueSaturation(of: rgb)
+            #expect(abs(back.hue - hue) < 1e-9 || abs(abs(back.hue - hue) - 1) < 1e-9)
+            #expect(abs(back.saturation - saturation) < 1e-9)
+        }
+    }
+
+    @Test func wheelEdgesArePrimariesAndCenterIsWhite() {
+        #expect(ColorMath.rgb(hue: 0, saturation: 1) == RGB(r: 1, g: 0, b: 0))
+        #expect(ColorMath.rgb(hue: 1.0 / 3, saturation: 1) == RGB(r: 0, g: 1, b: 0))
+        #expect(ColorMath.rgb(hue: 2.0 / 3, saturation: 1) == RGB(r: 0, g: 0, b: 1))
+        #expect(ColorMath.rgb(hue: 0.4, saturation: 0) == RGB(r: 1, g: 1, b: 1))
+        // Brightness doesn't matter, only hue and saturation.
+        let dim = ColorMath.hueSaturation(of: RGB(r: 0.5, g: 0.25, b: 0))
+        #expect(abs(dim.hue - 1.0 / 12) < 1e-9 && abs(dim.saturation - 1) < 1e-9)
+    }
+
     @Test func colorTemperatureRunsFromWarmToCool() {
         let warm = ColorMath.rgb(mirek: 454)
         let cool = ColorMath.rgb(mirek: 153)

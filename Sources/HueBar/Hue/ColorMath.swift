@@ -72,6 +72,43 @@ enum ColorMath {
         return RGB(r: unit(r), g: unit(g), b: unit(b))
     }
 
+    /// sRGB color for a hue (0..<1, red at 0) and saturation (0...1) at full brightness.
+    static func rgb(hue: Double, saturation: Double) -> RGB {
+        let wrapped = hue - floor(hue)
+        let sixths = wrapped * 6
+        let sector = min(Int(sixths), 5)
+        let fraction = sixths - Double(sector)
+        let amount = min(max(saturation, 0), 1)
+        let low = 1 - amount
+        let falling = 1 - amount * fraction
+        let rising = 1 - amount * (1 - fraction)
+        switch sector {
+        case 0: return RGB(r: 1, g: rising, b: low)
+        case 1: return RGB(r: falling, g: 1, b: low)
+        case 2: return RGB(r: low, g: 1, b: rising)
+        case 3: return RGB(r: low, g: falling, b: 1)
+        case 4: return RGB(r: rising, g: low, b: 1)
+        default: return RGB(r: 1, g: low, b: falling)
+        }
+    }
+
+    /// Hue (0..<1) and saturation (0...1) of a color, ignoring its brightness.
+    static func hueSaturation(of rgb: RGB) -> (hue: Double, saturation: Double) {
+        let brightest = max(rgb.r, rgb.g, rgb.b)
+        let delta = brightest - min(rgb.r, rgb.g, rgb.b)
+        guard brightest > 0, delta > 0 else { return (0, 0) }
+        var sixths: Double
+        if brightest == rgb.r {
+            sixths = (rgb.g - rgb.b) / delta
+        } else if brightest == rgb.g {
+            sixths = 2 + (rgb.b - rgb.r) / delta
+        } else {
+            sixths = 4 + (rgb.r - rgb.g) / delta
+        }
+        if sixths < 0 { sixths += 6 }
+        return (sixths / 6, delta / brightest)
+    }
+
     static func mirek(kelvin: Int) -> Int {
         Int((1_000_000 / Double(kelvin)).rounded())
     }

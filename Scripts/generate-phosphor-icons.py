@@ -36,6 +36,7 @@ ICONS = {
     "sunDim": ("sun-dim", ["regular", "fill"]),
     "palette": ("palette", ["regular", "fill", "duotone"]),
     "sparkle": ("sparkle", ["regular", "fill"]),
+    "eyedropper": ("eyedropper", ["regular"]),
     "warning": ("warning", ["fill", "duotone"]),
     "wifiSlash": ("wifi-slash", ["regular", "duotone"]),
     "magnifyingGlass": ("magnifying-glass", ["regular", "bold"]),
