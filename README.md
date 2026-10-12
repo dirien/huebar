@@ -29,8 +29,19 @@ The menu bar icon shows the connection state: a filled bulb when connected and a
 
 ## Install
 
+With [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask dirien/dirien/huebar
+```
+
+Or by hand:
+
 1. Download `HueBar-<version>.dmg` from the [latest release](https://github.com/dirien/huebar/releases/latest).
 2. Open it and drag **HueBar** to **Applications**.
+
+Then:
+
 3. Open HueBar. Releases are currently signed ad hoc rather than notarized by Apple, so macOS blocks the first launch. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to HueBar. You only need to do this once per version.
    (Since macOS 15, Control-click → Open no longer bypasses this. Alternatively run `xattr -dr com.apple.quarantine /Applications/HueBar.app`.)
 4. Click the bulb in the menu bar and allow HueBar to find devices on your local network.
@@ -74,6 +85,8 @@ Pushing a tag like `v1.2.0` runs [`release.yml`](.github/workflows/release.yml) 
 git tag v1.2.0 && git push origin v1.2.0
 ```
 
+For final (non-pre-release) versions, the [`homebrew.yml`](.github/workflows/homebrew.yml) job then points `Casks/huebar.rb` in [dirien/homebrew-dirien](https://github.com/dirien/homebrew-dirien) at the new DMG, runs `brew style` and `brew audit --strict --online` on it, and pushes it to the tap. Pushing needs a `HOMEBREW_TAP_DEPLOY_KEY` secret: the private half of an SSH deploy key with write access to the tap. Without it the cask is still audited, and you can update the tap by hand.
+
 ### Signing and notarization
 
 Without extra setup, releases are signed ad hoc, which is why users have to click **Open Anyway** once. To ship builds that open without any warning, join the [Apple Developer Program](https://developer.apple.com/programs/), create a **Developer ID Application** certificate, and add these repository secrets. The workflow then signs with the hardened runtime, notarizes the DMG with `notarytool`, and staples the tickets.
@@ -86,7 +99,7 @@ Without extra setup, releases are signed ad hoc, which is why users have to clic
 | `NOTARY_TEAM_ID` | Your team ID |
 | `NOTARY_PASSWORD` | An [app-specific password](https://support.apple.com/102654) for that Apple ID |
 
-Notarization is also what a Homebrew cask needs: since September 2026 Homebrew no longer accepts casks that fail Gatekeeper checks and has removed `--no-quarantine`.
+Notarization matters for Homebrew too. Homebrew applies quarantine to cask downloads so Gatekeeper still checks them, has removed `--no-quarantine`, and since September 2026 no longer accepts casks that fail Gatekeeper checks in the official `homebrew/cask` repository. That's why HueBar ships from its own tap for now, with a caveat explaining the one-time **Open Anyway** step instead of silently stripping quarantine. Once releases are notarized, the caveat can go and the cask could be submitted to `homebrew/cask`.
 
 ## How it works
 

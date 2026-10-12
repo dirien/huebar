@@ -28,6 +28,8 @@ jobs:
     name: Build and publish
     runs-on: macos-26
     timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       HAS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE != '' }}
       HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' && secrets.NOTARY_TEAM_ID != '' && secrets.NOTARY_PASSWORD != '' }}
@@ -37,6 +39,7 @@ jobs:
           fetch-depth: 0
 
       - name: Determine version
+        id: version
         run: |
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             version="${GITHUB_REF_NAME#v}"
@@ -44,6 +47,7 @@ jobs:
             version="0.0.0-dev.${GITHUB_RUN_NUMBER}"
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "Version $version (build $GITHUB_RUN_NUMBER)"
 
@@ -112,3 +116,13 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             build/HueBar-"$VERSION".dmg build/HueBar-"$VERSION".zip build/SHA256SUMS.txt \
             --verify-tag --title "HueBar $VERSION" --notes "$install_note" --generate-notes "${prerelease[@]}"
+
+  homebrew:
+    name: Homebrew cask
+    needs: release
+    # Pre-releases stay out of the tap.
+    if: github.ref_type == 'tag' && !contains(github.ref_name, '-')
+    uses: ./.github/workflows/homebrew.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit

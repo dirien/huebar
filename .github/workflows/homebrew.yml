@@ -1,0 +1,78 @@
+name: Homebrew
+
+# Points Casks/huebar.rb in dirien/homebrew-dirien at a published release and audits it on macOS.
+# release.yml calls this after publishing; run it by hand to re-check or re-publish a version.
+#
+# Pushing to the tap needs the HOMEBREW_TAP_DEPLOY_KEY secret: the private half of an SSH deploy key
+# with write access to dirien/homebrew-dirien. Without it the cask is updated and audited, not pushed.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version without the leading "v"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the leading "v", e.g. 0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    name: Update and audit cask
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ inputs.version }}
+      HAS_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY != '' }}
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+    steps:
+      - name: Tap dirien/dirien
+        run: brew tap dirien/dirien
+
+      - name: Point the cask at the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$(gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt --output - \
+            | awk -v file="HueBar-$VERSION.dmg" '$2 == file { print $1 }')"
+          if [[ -z "$sha" ]]; then
+            echo "No checksum for HueBar-$VERSION.dmg in release v$VERSION" >&2
+            exit 1
+          fi
+          tap="$(brew --repository dirien/dirien)"
+          sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$sha\"/" \
+            "$tap/Casks/huebar.rb"
+          git -C "$tap" diff
+
+      - name: Audit
+        run: |
+          brew style --cask dirien/dirien/huebar
+          brew audit --cask --strict --online dirien/dirien/huebar
+
+      - name: Push to the tap
+        if: env.HAS_DEPLOY_KEY == 'true'
+        env:
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          tap="$(brew --repository dirien/dirien)"
+          if git -C "$tap" diff --quiet; then
+            echo "Cask is already at $VERSION"
+            exit 0
+          fi
+          key="$RUNNER_TEMP/tap_deploy_key"
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          git -C "$tap" -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --all --message "huebar $VERSION"
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git -C "$tap" push git@github.com:dirien/homebrew-dirien.git HEAD:main
+          rm "$key"
