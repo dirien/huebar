@@ -13,8 +13,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Lint, build and test
+  lint:
+    name: Lint
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Lint
+        run: make lint
+
+  build:
+    name: Build and test
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -24,12 +37,6 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
-
-      - name: Install SwiftLint
-        run: brew install swiftlint
-
-      - name: Lint
-        run: make lint
 
       - name: Build
         run: make build

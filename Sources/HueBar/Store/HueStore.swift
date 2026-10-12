@@ -155,7 +155,6 @@ final class HueStore {
         guard !lit.isEmpty else { return 0 }
         return lit.map { $0.dimming?.brightness ?? 100 }.reduce(0, +) / Double(lit.count)
     }
-
 }
 
 // MARK: - Light control
@@ -288,7 +287,6 @@ extension HueStore {
         }
         activeWriters.remove(key)
     }
-
 }
 
 // MARK: - Pairing
@@ -399,7 +397,6 @@ extension HueStore {
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
-
 }
 
 // MARK: - Connection
@@ -504,7 +501,6 @@ extension HueStore {
     private static func index<T: Identifiable>(_ items: [T]) -> [T.ID: T] {
         Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
-
 }
 
 // MARK: - Event stream
