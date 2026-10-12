@@ -73,6 +73,7 @@ Run `make` on its own to list all tasks:
 | `make dmg` | Universal release build packaged as a DMG and ZIP in `build/` |
 | `make icons` | Regenerate the Phosphor icon file |
 | `make app-icon` | Regenerate `Resources/AppIcon.icns` from `assets/logo.svg` (needs `brew install librsvg`) |
+| `make social-preview` | Regenerate the GitHub social preview, `assets/social-preview.png` (needs librsvg and the Inter font) |
 
 Formatting is owned by swift-format (`.swift-format`, 4-space indent, 120 columns). SwiftLint (`.swiftlint.yml`) covers correctness and idiom, with its formatting-only rules turned off so the two don't disagree.
 

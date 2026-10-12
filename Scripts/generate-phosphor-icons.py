@@ -254,9 +254,12 @@ def layers(svg):
 def load_package(argv):
     if len(argv) > 1:
         return Path(argv[1])
+    target = Path(__file__).resolve().parent / ".phosphor-cache"
+    cached = target / "package"
+    if (cached / "package.json").exists() and f'"version": "{VERSION}"' in (cached / "package.json").read_text():
+        return cached
     url = f"https://registry.npmjs.org/@phosphor-icons/core/-/core-{VERSION}.tgz"
     data = urllib.request.urlopen(url).read()
-    target = Path(__file__).resolve().parent / ".phosphor-cache"
     with tarfile.open(fileobj=io.BytesIO(data)) as archive:
         archive.extractall(target, filter="data")
     return target / "package"

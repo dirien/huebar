@@ -11,7 +11,7 @@ LINT_PATHS := Sources Tests Package.swift
 VERSION ?= $(patsubst v%,%,$(shell git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo v0.0.0))
 
 .DEFAULT_GOAL := help
-.PHONY: help build test app install dmg run lint format fix check icons app-icon clean tools
+.PHONY: help build test app install dmg run lint format fix check icons app-icon social-preview clean tools
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -53,6 +53,9 @@ icons: ## Regenerate Sources/HueBar/Icons/PhosphorIcons.swift from Phosphor
 
 app-icon: ## Regenerate Resources/AppIcon.icns from assets/logo.svg (needs librsvg)
 	Scripts/generate-app-icon.sh
+
+social-preview: ## Regenerate assets/social-preview.png (needs librsvg and the Inter font)
+	python3 Scripts/generate-social-preview.py
 
 clean: ## Remove build products
 	rm -rf .build build
