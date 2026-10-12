@@ -1,0 +1,114 @@
+name: Release
+
+# Push a tag like v1.2.0 to publish a release. Running the workflow manually builds the same
+# DMG and ZIP and attaches them to the run as artifacts without publishing anything.
+#
+# Optional secrets for a signed and notarized build (Apple Developer Program membership required):
+#   MACOS_CERTIFICATE           base64-encoded "Developer ID Application" certificate (.p12)
+#   MACOS_CERTIFICATE_PASSWORD  password of that .p12
+#   NOTARY_APPLE_ID             Apple ID used for notarization
+#   NOTARY_TEAM_ID              Developer team ID
+#   NOTARY_PASSWORD             app-specific password for that Apple ID
+# Without them the app is signed ad hoc and users have to approve it once in System Settings.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      HAS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' && secrets.NOTARY_TEAM_ID != '' && secrets.NOTARY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "Version $version (build $GITHUB_RUN_NUMBER)"
+
+      - name: Run tests
+        run: make test
+
+      - name: Import signing certificate
+        if: env.HAS_CERTIFICATE == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
+          existing=()
+          while IFS= read -r line; do existing+=("$(xargs <<< "$line")"); done < <(security list-keychains -d user)
+          security list-keychains -d user -s "$keychain" "${existing[@]}"
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
+          if [[ -z "$identity" ]]; then
+            echo "No Developer ID Application identity in MACOS_CERTIFICATE" >&2
+            exit 1
+          fi
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Build universal app
+        run: UNIVERSAL=1 ./build.sh
+
+      - name: Package DMG and ZIP
+        env:
+          NOTARY_APPLE_ID: ${{ env.HAS_NOTARY == 'true' && secrets.NOTARY_APPLE_ID || '' }}
+          NOTARY_TEAM_ID: ${{ env.HAS_NOTARY == 'true' && secrets.NOTARY_TEAM_ID || '' }}
+          NOTARY_PASSWORD: ${{ env.HAS_NOTARY == 'true' && secrets.NOTARY_PASSWORD || '' }}
+        run: Scripts/package.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: HueBar-${{ env.VERSION }}
+          path: |
+            build/HueBar-*.dmg
+            build/HueBar-*.zip
+            build/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          [[ "$VERSION" == *-* ]] && prerelease=(--prerelease)
+          if [[ "$HAS_NOTARY" == true ]]; then
+            install_note="Download the DMG, open it and drag **HueBar** to **Applications**."
+          else
+            install_note="Download the DMG, open it and drag **HueBar** to **Applications**. This build isn't notarized by Apple, so the first launch is blocked: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to HueBar. (Or run \`xattr -dr com.apple.quarantine /Applications/HueBar.app\`.)"
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            build/HueBar-"$VERSION".dmg build/HueBar-"$VERSION".zip build/SHA256SUMS.txt \
+            --verify-tag --title "HueBar $VERSION" --notes "$install_note" --generate-notes "${prerelease[@]}"
